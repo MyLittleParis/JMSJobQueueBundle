@@ -45,7 +45,7 @@ class CleanUpCommand extends ContainerAwareCommand
             ->getResult();
 
         /** @var JobRepository $repository */
-        $repository = $em->getRepository(Job::class);
+        $repository = $em->getRepository("JMS\JobQueueBundle\Command\Job");
 
         foreach ($jobs as $job) {
             $repository->closeJob($job, Job::STATE_INCOMPLETE);
