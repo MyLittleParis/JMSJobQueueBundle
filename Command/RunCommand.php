@@ -406,7 +406,6 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $pb
                 ->add('jms-job-queue:mark-incomplete')
                 ->add($job->getId())
-                ->add('--env='.$this->env)
                 ->add('--verbose')
             ;
 
@@ -436,7 +435,6 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         $pb
             ->add(PHP_BINARY)
             ->add($this->consoleFile)
-            ->add('--env='.$this->env)
         ;
 
         if ($this->verbose) {
