@@ -22,7 +22,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
 use JMS\JobQueueBundle\Exception\InvalidStateTransitionException;
 use JMS\JobQueueBundle\Exception\LogicException;
-use Symfony\Component\HttpKernel\Exception\FlattenException;
+use Symfony\Component\Debug\Exception\FlattenException;
 
 /**
  * @ORM\Entity(repositoryClass = "JMS\JobQueueBundle\Entity\Repository\JobRepository")
@@ -110,7 +110,7 @@ class Job
     /** @ORM\Column(type = "datetime", name="checkedAt", nullable = true) */
     private $checkedAt;
 
-    /** @ORM\Column(type = "string", length = 50, nullable = true) */
+    /** @ORM\Column(type = "string", name="workerName", length = 50, nullable = true) */
     private $workerName;
 
     /** @ORM\Column(type = "datetime", name="executeAfter", nullable = true) */
@@ -155,7 +155,7 @@ class Job
      */
     private $originalJob;
 
-    /** @ORM\OneToMany(targetEntity = "Job", mappedBy = "originalJob", cascade = {"persist", "remove", "detach"}) */
+    /** @ORM\OneToMany(targetEntity = "Job", mappedBy = "originalJob", cascade = {"persist", "remove", "detach", "refresh"}) */
     private $retryJobs;
 
     /** @ORM\Column(type = "jms_job_safe_object", name="stackTrace", nullable = true) */
@@ -186,6 +186,20 @@ class Job
     public static function isNonSuccessfulFinalState($state)
     {
         return in_array($state, array(self::STATE_CANCELED, self::STATE_FAILED, self::STATE_INCOMPLETE, self::STATE_TERMINATED), true);
+    }
+
+    public static function getStates()
+    {
+        return array(
+            self::STATE_NEW,
+            self::STATE_PENDING,
+            self::STATE_CANCELED,
+            self::STATE_RUNNING,
+            self::STATE_FINISHED,
+            self::STATE_FAILED,
+            self::STATE_TERMINATED,
+            self::STATE_INCOMPLETE
+        );
     }
 
     public function __construct($command, array $args = array(), $confirmed = true, $queue = self::DEFAULT_QUEUE, $priority = self::PRIORITY_DEFAULT)
@@ -251,6 +265,11 @@ class Job
     public function getPriority()
     {
         return $this->priority * -1;
+    }
+
+    public function isInFinalState()
+    {
+        return ! $this->isNew() && ! $this->isPending() && ! $this->isRunning();
     }
 
     public function isStartable()
@@ -539,6 +558,19 @@ class Job
     public function isRetryJob()
     {
         return null !== $this->originalJob;
+    }
+
+    public function isRetried()
+    {
+        foreach ($this->retryJobs as $job) {
+            /** @var Job $job */
+
+            if ( ! $job->isInFinalState()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function checked()

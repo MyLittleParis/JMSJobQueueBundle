@@ -51,9 +51,31 @@ class JobRepositoryTest extends BaseTestCase
         $this->assertNotSame($a, $this->repo->getOrCreateIfNotExists('a', array('foo')));
     }
 
+    public function testFindPendingJobReturnsAllDependencies()
+    {
+        $a = new Job('a');
+        $b = new Job('b');
+
+        $this->em->persist($a);
+        $this->em->persist($b);
+        $this->em->flush();
+
+        $c = new Job('c');
+        $c->addDependency($a);
+        $c->addDependency($b);
+        $this->em->persist($c);
+        $this->em->flush();
+        $this->em->clear();
+
+        $cReloaded = $this->repo->findPendingJob(array($a->getId(), $b->getId()));
+        $this->assertNotNull($cReloaded);
+        $this->assertEquals($c->getId(), $cReloaded->getId());
+        $this->assertCount(2, $cReloaded->getDependencies());
+    }
+
     public function testFindPendingJob()
     {
-        $this->assertNull($this->repo->findPendingJob('my-name'));
+        $this->assertNull($this->repo->findPendingJob());
 
         $a = new Job('a');
         $a->setState('running');
@@ -62,8 +84,22 @@ class JobRepositoryTest extends BaseTestCase
         $this->em->persist($b);
         $this->em->flush();
 
-        $this->assertSame($b, $this->repo->findPendingJob('my-name'));
-        $this->assertNull($this->repo->findPendingJob('my-name', array($b->getId())));
+        $this->assertSame($b, $this->repo->findPendingJob());
+        $this->assertNull($this->repo->findPendingJob(array($b->getId())));
+    }
+
+    public function testFindPendingJobInRestrictedQueue()
+    {
+        $this->assertNull($this->repo->findPendingJob());
+
+        $a = new Job('a');
+        $b = new Job('b', array(), true, 'other_queue');
+        $this->em->persist($a);
+        $this->em->persist($b);
+        $this->em->flush();
+
+        $this->assertSame($a, $this->repo->findPendingJob());
+        $this->assertSame($b, $this->repo->findPendingJob(array(), array(), array('other_queue')));
     }
 
     public function testFindStartableJob()
